@@ -20,6 +20,8 @@ import { MailsService } from './mails.service';
             user: configService.get('MAIL_USER'),
             pass: configService.get('MAIL_PASS'),
           },
+          maxConnections: 5,
+          maxMessages: 50,
         },
         defaults: {
           headers: {

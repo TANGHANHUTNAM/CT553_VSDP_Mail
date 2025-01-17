@@ -1,7 +1,10 @@
-import { RabbitMQModule } from '@golevelup/nestjs-rabbitmq';
+import {
+  MessageHandlerErrorBehavior,
+  RabbitMQModule,
+} from '@golevelup/nestjs-rabbitmq';
 import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
-import { GlobalEventSettings, QUEUE } from './rabbitmq-constant';
+import { EXCHANGE } from './rabbitmq-constant';
 
 @Module({
   imports: [
@@ -11,28 +14,22 @@ import { GlobalEventSettings, QUEUE } from './rabbitmq-constant';
         exchanges: [
           {
             type: 'topic',
-            name: GlobalEventSettings.EXCHANGE,
+            name: EXCHANGE.EMAIL,
           },
-          { name: GlobalEventSettings.DLX, type: 'topic' },
-        ],
-        uri: configService.get('RABBITMQ_URI'),
-        connectionInitOptions: { wait: true },
-        channels: {
-          'channel-1': {
-            prefetchCount: 20,
-            default: true,
-            deadLetterExchange: GlobalEventSettings.DLX,
-          },
-        },
-        queues: [
           {
-            name: QUEUE.EMAIL_SEND,
-            key: 'email.send',
-            options: {
-              durable: true,
-            },
+            type: 'direct',
+            name: EXCHANGE.DLX,
+          },
+          {
+            type: 'topic',
+            name: EXCHANGE.RETRY,
           },
         ],
+        prefetchCount: 50,
+        defaultRpcErrorBehavior: MessageHandlerErrorBehavior.NACK,
+        defaultSubscribeErrorBehavior: MessageHandlerErrorBehavior.NACK,
+        uri: configService.get('RABBITMQ_URI'),
+        connectionInitOptions: { wait: true, reject: true, timeout: 10000 },
       }),
       inject: [ConfigService],
     }),
