@@ -17,7 +17,10 @@ import {
   ROUTING_KEY,
 } from 'src/rabbitmq/rabbitmq-constant';
 import { ReplyErrorCallback } from 'src/rabbitmq/reply.error.callback';
-import { IUserSendMail } from './interfaces/user-account-creation-mail';
+import {
+  IUserSendMail,
+  IUserSendMailOTP,
+} from './interfaces/user-account-creation-mail';
 import { delayProcess } from 'src/rabbitmq/delay.process';
 
 @Injectable()
@@ -50,6 +53,48 @@ export class MailsService {
     }
   }
 
+  async sendMailOTPChangePassword(user: IUserSendMailOTP) {
+    try {
+      const { userEmail, userOTP } = user;
+      await this.mailerService.sendMail({
+        to: userEmail,
+        subject: 'Mã OTP Đổi Mật Khẩu Tài Khoản VSDP',
+        template: './send-mail-otp-change-password',
+        context: {
+          userEmail,
+          userOTP,
+        },
+      });
+      this.logService.log(`Email sent to ${userEmail || 'unknown'}`);
+    } catch (error) {
+      this.logService.error(`Error sending email to ${user?.userEmail}`);
+      throw error;
+    }
+  }
+
+  // Send email to change password OTP
+  @RabbitRPC({
+    exchange: EXCHANGE.EMAIL,
+    routingKey: ROUTING_KEY.OTP_MAIL,
+    queue: QUEUE.OTP_MAIL,
+    queueOptions: {
+      deadLetterExchange: EXCHANGE.DLX,
+      deadLetterRoutingKey: ROUTING_KEY.DEAD_LETTER,
+      messageTtl: 60000,
+      maxLength: 100,
+      durable: true,
+    },
+    usePersistentReplyTo: true,
+  })
+  async onEmailOTPChangePassword(@RabbitPayload() message: IUserSendMailOTP) {
+    try {
+      await this.sendMailOTPChangePassword(message);
+    } catch (error) {
+      throw new Nack(true);
+    }
+  }
+
+  // Send email to login user
   @RabbitRPC({
     exchange: EXCHANGE.EMAIL,
     routingKey: ROUTING_KEY.EMAIL_SEND,
